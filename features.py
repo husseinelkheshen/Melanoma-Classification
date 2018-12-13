@@ -7,6 +7,7 @@ import glob
 import datetime
 
 filenames = glob.glob("ddsm-mammography/*.tfrecords")
+print(filenames)
 raw_img_dir = "raw_images/"
 
 # Extract features using the keys set during creation
@@ -14,15 +15,25 @@ feature = {'label': tf.FixedLenFeature([], tf.int64),
         'label_normal': tf.FixedLenFeature([], tf.int64),
         'image': tf.FixedLenFeature([], tf.string)}
 
-def _parse_(serialized_img):
-    features = tf.parse_single_example(serialized_img, features=feature)
-    # Convert the image data from string back to the numbers
-    image = tf.decode_raw(features['image'], tf.uint8)
-    # image = tf.image.decode_png(features['image'],channels=1)
-    #label = features['label']
-    label_normal = features['label_normal']
-    image = tf.reshape(image, [299, 299, 1])
+sess = tf.Session()
 
+
+def _parse_(serialized_img):
+    print(serialized_img)
+    features = {'label': tf.FixedLenFeature([], tf.int64, default_value=-1),
+               'label_normal': tf.FixedLenFeature([], tf.int64, default_value=-1),
+               'image': tf.FixedLenFeature([], tf.string, default_value="")}
+    # features = tf.parse_single_example(serialized_img, features=feature)
+    parsed_features = tf.parse_example(serialized_img, features)
+    print(parsed_features)
+    print(parsed_features['label'])
+    return parsed_features['image'], parsed_features['label_normal'], parsed_features['label']
+    # # Convert the image data from string back to the numbers
+    # image = tf.decode_raw(features['image'], tf.uint8)
+    # # image = tf.image.decode_png(features['image'],channels=1)
+    # #label = features['label']
+    # label_normal = features['label_normal']
+    # image = tf.reshape(image, [299, 299, 1])
     """
     image_jpeg = tf.image.encode_jpeg(image)
     fname = tf.constant('2.jpg')
@@ -38,18 +49,16 @@ def _parse_(serialized_img):
 
 
 def process_tfrecords(batch_size=32):
-    tfrecord_dataset = tf.data.TFRecordDataset(filenames)
-    tfrecord_dataset = tfrecord_dataset.map(lambda x:_parse_(x)).shuffle(True) \
-                            .batch(batch_size)
+    tfrecord_dataset = tf.data.TFRecordDataset(filenames).shuffle(True).batch(batch_size)
+    tfrecord_dataset = tfrecord_dataset.map(_parse_)
     tfrecord_iterator = tfrecord_dataset.make_one_shot_iterator()
-    batched_data = tfrecord_iterator.get_next()
-    return batched_data
+    return tfrecord_iterator
 
 
 # NOTE: this function might need to be tweaked for whatever model we want
 def train_model():
     training_data = process_tfrecords(32)
-    print(training_data)
+    # print(training_data)
 
     # TODO: set up a keras estimator to be our model
     # see these links for examples of TFRecords being used as input to keras:
