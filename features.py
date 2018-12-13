@@ -4,17 +4,17 @@ import tensorflow as tf
 import numpy as np
 import math
 import glob
+import datetime
 
 filenames = glob.glob("ddsm-mammography/*.tfrecords")
+raw_img_dir = "raw_images/"
 
 # Extract features using the keys set during creation
 feature = {'label': tf.FixedLenFeature([], tf.int64),
         'label_normal': tf.FixedLenFeature([], tf.int64),
         'image': tf.FixedLenFeature([], tf.string)}
 
-
 def _parse_(serialized_img):
-    # Decode the record read by the reader
     features = tf.parse_single_example(serialized_img, features=feature)
     # Convert the image data from string back to the numbers
     image = tf.decode_raw(features['image'], tf.uint8)
@@ -22,6 +22,16 @@ def _parse_(serialized_img):
     #label = features['label']
     label_normal = features['label_normal']
     image = tf.reshape(image, [299, 299, 1])
+
+    """
+    image_jpeg = tf.image.encode_jpeg(image)
+    fname = tf.constant('2.jpg')
+    fwrite = tf.write_file(fname, image_jpeg)
+    sess = tf.Session()
+    result = sess.run(fwrite)
+    """
+
+    #fname = tf.constant('image' + ".jpeg")
     #image_lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
     #return (image, label_normal)
     return (dict({'image':image}), label_normal)
@@ -32,28 +42,22 @@ def process_tfrecords(batch_size=32):
     tfrecord_dataset = tfrecord_dataset.map(lambda x:_parse_(x)).shuffle(True) \
                             .batch(batch_size)
     tfrecord_iterator = tfrecord_dataset.make_one_shot_iterator()
-    return tfrecord_iterator.get_next()
+    batched_data = tfrecord_iterator.get_next()
+    return batched_data
 
-"""
-def get_raw_data():
-    data = process_tfrecords(batch_size=1)
-    #print(data)
-    return data
-
-get_raw_data()
-"""
 
 # NOTE: this function might need to be tweaked for whatever model we want
 def train_model():
-    # defining the type of features columns to be used on model.
-    feature_column = [tf.feature_column.numeric_column(key='image',shape=(299, 299, 1))]
+    training_data = process_tfrecords(32)
+    print(training_data)
 
-    # defining the model
-    model = tf.estimator.DNNClassifier([100,100],n_classes=10,feature_columns=feature_column)
-    model.train(lambda:process_tfrecords(32),steps=200)
-    return model
+    # TODO: set up a keras estimator to be our model
+    # see these links for examples of TFRecords being used as input to keras:
+    # https://www.dlology.com/blog/how-to-leverage-tensorflows-tfrecord-to-train-keras-model/
+    # https://github.com/Tony607/Keras_catVSdog_tf_estimator/blob/master/keras_estimator_vgg16-cat_vs_dog-TFRecord.ipynb
 
 train_model()
+
 
 """
 # Given a image, returns a dictionary with keys of intensities, and values of the number of occurrences of that intensity
