@@ -52,6 +52,8 @@ def load_data():
     #print(tile_df.sample(1))
     #print(tile_df['image'].map(lambda x: x.shape).value_counts())
     # TODO: we should save tile_df to disk so we dont have to import
+    tile_df.to_pickle('tile_dataframe.pkl')
+    # load with tile_df = pd.read_pickle('tile_dataframe.pkl')
     # all the images each time, too
     return tile_df
 
@@ -128,11 +130,14 @@ def train_model():
               validation_data=(imgs_val, labels_val))
 
     score = model.evaluate(imgs_test, labels_test, verbose=1)
+
     print('Test loss:', score[0])
     print('Test accuracy:', score[1])
 
 
     # TODO: save model to disk so we dont have to always retrain
+    model.save('saved_model.h5')
+    # load with model = load_model('saved_model.h5')
 
 
 train_model()
