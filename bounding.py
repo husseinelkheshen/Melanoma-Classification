@@ -127,6 +127,7 @@ def seg2graph(seg):
 # Returns positive, negative, validation positive, and validation negative in tuples
 # All non-lesion examples are labeled as such in superpixels, and all
 # lesion-examples take the 3 darkest regions as lesion-labelled
+# The perceptron is then trained and tested against these labels
 def pool_superpixels(tile_df=None):
     if tile_df is None:
         with open('tile_dataframe.pkl', 'rb') as f:
