@@ -34,6 +34,10 @@ def load_data():
     file_path = "tile_df.pkl"
     n_bytes = 2 ** 31
     max_bytes = 2 ** 31 - 1
+
+    # If the pandas dataframe has been saved to disk we
+    # do not have to go through the process of creating
+    # it and loading the image data again
     if len(glob(file_path)) > 0:
         bytes_in = bytearray(0)
         input_size = os.path.getsize(file_path)
@@ -42,64 +46,42 @@ def load_data():
                 bytes_in += f_in.read(max_bytes)
         tile_df = pickle.loads(bytes_in)
         return tile_df
-    print("Started")
+
     imageid_path_dict = {os.path.splitext(os.path.basename(x))[0]: x \
                      for x in glob(os.path.join(image_dir, '*.jpg'))}
 
-    #print(imageid_path_dict)
     tile_df = pd.read_csv(metadata_path)
     tile_df['dx'] = np.where(tile_df['dx'] != 'bkl', 'mal', tile_df['dx'])
     tile_df['path'] = tile_df['image_id'].map(imageid_path_dict.get)
     tile_df['cell_type'] = tile_df['dx'].map(lesion_type_dict.get)
     tile_df['cell_type_idx'] = pd.Categorical(tile_df['cell_type']).codes
-    #print(tile_df.sample(3))
-
-    # NOTE: This line is only for speeding up development, it should be removed
-    # when doing true model testing
-    #tile_df = tile_df.sample(100)
 
     # resize images
     tile_df['image'] = tile_df['path'].map(lambda x: np.asarray(Image\
         .open(x).resize((img_rows, img_cols))))
 
-    #print(tile_df.sample(1))
-    #print(tile_df['image'].map(lambda x: x.shape).value_counts())
-    # TODO: we should save tile_df to disk so we dont have to import
-    # data = bytearray(n_bytes)
+    # Save model to disk
     bytes_out = pickle.dumps(tile_df)
     with open(file_path, 'wb') as f_out:
         for idx in range(0, len(bytes_out), max_bytes):
             f_out.write(bytes_out[idx:idx + max_bytes])
-    # all the images each time, too
-    print("Done")
+
     return tile_df
 
 
 def split_data(tile_df):
-    #lab = tile_df.cell_type_idx'
-
-    # split data into test, train, validation
-    # the split is as follows: 80% non-test, 20% test
-    # --> then the non-test is split 70-30 into training and validation
+    # Split data into test, train, validation
+    # The split is as follows: 80% non-test, 20% test,
+    # with non-test split 70-30 into training and validation
     imgs_train, imgs_test, labels_train, labels_test = train_test_split(tile_df, tile_df['cell_type_idx'], test_size=0.2)
 
     imgs_train, imgs_val, labels_train, labels_val = train_test_split(imgs_train, labels_train, test_size=0.3)
 
-    # TODO: possibly use Keras' ImageDataGenerator do set up the image data?
-    # a friend said it can be used to standardize/normalize image data, but
-    # One of the kernels for our dataset subtracted out the mean image value and
-    # then divided everything by the standard deviation. Idk enough stats to know
-    # why it was being done though lol, I pasted it below:
     imgs_train = np.asarray(imgs_train['image'].tolist())
     imgs_test = np.asarray(imgs_test['image'].tolist())
     imgs_val = np.asarray(imgs_val['image'].tolist())
 
-    """
-    print("TEST LABS")
-    print(labels_val)
-    print("TEST IMGS")
-    print(imgs_val[0])
-    """
+    # Save images to disk
     file_path = "images_segmentation.pkl"
     max_bytes = 2 ** 31 - 1
     bytes_out = pickle.dumps((imgs_train, labels_train, imgs_val, labels_val, imgs_test, labels_test))
@@ -114,7 +96,7 @@ def train_model():
     tile_df = load_data()
     imgs_train, labels_train, imgs_val, labels_val, imgs_test, labels_test = split_data(tile_df)
 
-    # TODO: set up a sequential keras model (there's lots of stuff about this online)
+    # Create a Keras Sequential model with a few convolutional layers
     model = Sequential()
 
     model.add(Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=(img_rows, img_cols, img_channels)))
@@ -158,7 +140,7 @@ def train_model():
     print('Test accuracy:', score[1])
 
 
-    # TODO: save model to disk so we dont have to always retrain
+    # Save model to disk
     model.save('saved_model.h5')
     # load with model = load_model('saved_model.h5')
 
