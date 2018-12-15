@@ -6,6 +6,7 @@ import tensorflow as tf
 from PIL import Image
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+import pickle
 
 from tensorflow.keras.utils import to_categorical # used for converting labels to one-hot-encoding
 from tensorflow.keras.models import Sequential
@@ -19,8 +20,8 @@ from tensorflow.keras.layers import Flatten
 img_rows = 300
 img_cols = 300
 img_channels = 3
-metadata_path = r"skin-lesions\HAM10000_metadata.csv"
-image_dir = r"skin-lesions\images"
+metadata_path = r"skin-lesions/HAM10000_metadata.csv"
+image_dir = r"skin-lesions/images"
 
 
 lesion_type_dict = {
@@ -30,6 +31,18 @@ lesion_type_dict = {
 
 
 def load_data():
+    file_path = "tile_df.pkl"
+    n_bytes = 2 ** 31
+    max_bytes = 2 ** 31 - 1
+    if len(glob(file_path)) > 0:
+        bytes_in = bytearray(0)
+        input_size = os.path.getsize(file_path)
+        with open(file_path, 'rb') as f_in:
+            for _ in range(0, input_size, max_bytes):
+                bytes_in += f_in.read(max_bytes)
+        tile_df = pickle.loads(bytes_in)
+        return tile_df
+    print("Started")
     imageid_path_dict = {os.path.splitext(os.path.basename(x))[0]: x \
                      for x in glob(os.path.join(image_dir, '*.jpg'))}
 
@@ -52,9 +65,13 @@ def load_data():
     #print(tile_df.sample(1))
     #print(tile_df['image'].map(lambda x: x.shape).value_counts())
     # TODO: we should save tile_df to disk so we dont have to import
-    tile_df.to_pickle('tile_dataframe.pkl')
-    # load with tile_df = pd.read_pickle('tile_dataframe.pkl')
+    # data = bytearray(n_bytes)
+    bytes_out = pickle.dumps(tile_df)
+    with open(file_path, 'wb') as f_out:
+        for idx in range(0, len(bytes_out), max_bytes):
+            f_out.write(bytes_out[idx:idx + max_bytes])
     # all the images each time, too
+    print("Done")
     return tile_df
 
 
@@ -83,6 +100,12 @@ def split_data(tile_df):
     print("TEST IMGS")
     print(imgs_val[0])
     """
+    file_path = "images_segmentation.pkl"
+    max_bytes = 2 ** 31 - 1
+    bytes_out = pickle.dumps((imgs_train, labels_train, imgs_val, labels_val, imgs_test, labels_test))
+    with open(file_path, 'wb') as f_out:
+        for idx in range(0, len(bytes_out), max_bytes):
+            f_out.write(bytes_out[idx:idx + max_bytes])
 
     return imgs_train, labels_train, imgs_val, labels_val, imgs_test, labels_test
 
@@ -140,4 +163,4 @@ def train_model():
     # load with model = load_model('saved_model.h5')
 
 
-train_model()
+# train_model()
