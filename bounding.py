@@ -175,57 +175,29 @@ def pool_superpixels(tile_df=None):
     return pos, neg, jpos, jneg
 
 
-def train_bounding_model():
-    tile_df = load_data()
-    imgs_train, labels_train, imgs_val, labels_val, imgs_test, labels_test = split_data(tile_df)
-
-    # TODO: set up a sequential keras model (there's lots of stuff about this online)
-    model = Sequential()
-
-    model.add(Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=(img_rows, img_cols, img_channels)))
-    model.add(Conv2D(32, (3, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(0.25))
-
-    model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
-    model.add(Conv2D(64, (3, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(0.25))
-
-    model.add(Conv2D(124, (3, 3), padding='same', activation='relu'))
-    model.add(Conv2D(124, (3, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(0.25))
-
-    model.add(Flatten())
-    model.add(Dense(64, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(1, activation='sigmoid'))
-
-    print(model.summary())
-
-    model.compile(optimizer=tf.train.AdamOptimizer(), \
-                           loss='binary_crossentropy', \
-                           metrics=['accuracy'])
-
-    batch_size = 32
-    epochs = 12
-
-    history = model.fit(imgs_train, labels_train,
-              batch_size=batch_size,
-              epochs=epochs,
-              verbose=1,
-              validation_data=(imgs_val, labels_val))
-
-    score = model.evaluate(imgs_test, labels_test, verbose=1)
-
-    print('Test loss:', score[0])
-    print('Test accuracy:', score[1])
-
-
-    # TODO: save model to disk so we dont have to always retrain
-    model.save('saved_model.h5')
-    # load with model = load_model('saved_model.h5')
+def test_superpixels(perceptron, imgs):
+    outimages = []
+    for img in imgs:
+        supers = superpixels(img)
+        img = rgb2gray(img)
+        adjacency_mx, region_pixels = seg2graph(supers)
+        values = []
+        inbox = []
+        img = img.ravel()
+        for superpix in region_pixels:
+            val = float(np.sum(img[superpix])) / len(superpix)
+            values.append(val)
+        values.sort()
+        labels = perceptron.predict(values)
+        for ind, val in enumerate(labels[0]):
+            if val == 1:
+                inbox.append(region_pixels[ind])
+        for superpix in inbox:
+            img[superpix] = max(min(values) - 15, min(values))
+        img.reshape(300, 300)
+        outimages.append(img)
+        print(str(len(inbox)) + " / " + str(len(region_pixels)) + " superpixels determined part of lesion.")
+    return outimages
 
 
 tile_df = load_data()
@@ -244,10 +216,10 @@ else:
     pos, neg, jpos, jneg = pool_superpixels(tile_df)
     print(len(pos))
     print(len(neg))
-    neglab = [0] * len(neg)
-    poslab = [1] * len(pos)
-    jneglab = [0] * len(jneg)
-    jposlab = [1] * len(jpos)
+    neglab = [1] * len(neg)
+    poslab = [0] * len(pos)
+    jneglab = [1] * len(jneg)
+    jposlab = [0] * len(jpos)
     jinputdata = np.array(jpos + jneg)
     jinputlabels = jposlab + jneglab
     inputdata = np.array(pos + neg)
@@ -275,5 +247,29 @@ print(score[1])
 print(score)
 with open('perceptron-score.pkl', 'wb') as f:
     pickle.dump(score)
+
+file_path = "image_segmentation.pkl"
+n_bytes = 2 ** 31
+max_bytes = 2 ** 31 - 1
+if len(glob(file_path)) > 0:
+    bytes_in = bytearray(0)
+    input_size = os.path.getsize(file_path)
+    with open(file_path, 'rb') as f_in:
+        for _ in range(0, input_size, max_bytes):
+            bytes_in += f_in.read(max_bytes)
+        _, _, _, _, imgs_test, labels_test = pickle.loads(bytes_in)
+else:
+    _, _, _, _, imgs_test, labels_test = split_data(tile_df)
+
+test_imgs = []
+for i, j in enumerate(labels_test):
+    if j == 1:
+        test_imgs.append(imgs_test[i])
+imgs = test_superpixels(perceptron, test_imgs)
+
+bytes_out = pickle.dumps(imgs)
+with open(file_path, 'wb') as f_out:
+    for idx in range(0, len(bytes_out), max_bytes):
+        f_out.write(bytes_out[idx:idx + max_bytes])
 
 print("DONE!")
