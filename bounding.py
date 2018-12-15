@@ -123,7 +123,8 @@ def seg2graph(seg):
          region_pixels[r].append(px_id)
    return adjacency_mx, region_pixels
 
-
+# Adds artificial labels to training and validation superpixels
+# Returns positive, negative, validation positive, and validation negative in tuples
 def pool_superpixels(tile_df=None):
     if tile_df is None:
         with open('tile_dataframe.pkl', 'rb') as f:
@@ -174,7 +175,7 @@ def pool_superpixels(tile_df=None):
             neg += perneg[0:3]
     return pos, neg, jpos, jneg
 
-
+# Outputs array of images with bounding on superpixels determined to be part of the lesion
 def test_superpixels(perceptron, imgs):
     outimages = []
     for img in imgs:
@@ -232,10 +233,6 @@ else:
         pickle.dump(jinputdata, f)
     with open('validlab.pkl', 'wb') as f:
         pickle.dump(jinputlabels, f)
-# with open('inputdata.pkl', 'rb') as f:
-#     inputdata = np.array(pickle.load(f))
-# with open('inputlabels.pkl', 'rb') as f:
-#     inputlabels = pickle.load(f)
     perceptron = Perceptron()
     perceptron.fit(inputdata.reshape(-1, 1), inputlabels)
     with open('perceptron-parameters.pkl', 'wb') as f:
@@ -265,6 +262,8 @@ test_imgs = []
 for i, j in enumerate(labels_test):
     if j == 1:
         test_imgs.append(imgs_test[i])
+
+# This is the array of bounded images to be plotted
 imgs = test_superpixels(perceptron, test_imgs)
 
 bytes_out = pickle.dumps(imgs)
