@@ -145,4 +145,4 @@ def train_model():
     # load with model = load_model('saved_model.h5')
 
 
-# train_model()
+train_model()

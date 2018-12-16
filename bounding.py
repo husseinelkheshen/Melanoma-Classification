@@ -24,6 +24,7 @@ from tensorflow.keras.layers import MaxPooling2D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Flatten
 
+# Borrowed from previous assignment
 def gaussian_deriv_1d(sigma, deriv = 0, min_width = None):
    # compute x range
    if min_width is None:
@@ -50,7 +51,7 @@ def gaussian_deriv_1d(sigma, deriv = 0, min_width = None):
    filt = np.atleast_2d(g / np.sum(np.abs(g)))
    return filt
 
-
+# Borrowed from previous assignment
 def gaussian_deriv_2d( \
       sigma, deriv_x = 0, deriv_y = 0, ori = 0.0, min_width = None):
    gx = gaussian_deriv_1d(sigma, deriv_x, min_width)
@@ -59,12 +60,12 @@ def gaussian_deriv_2d( \
    filt = scipy.ndimage.rotate(filt, (180.0 / np.pi) * ori, reshape=False)
    return filt
 
-
+# Borrowed from previous assignment
 def rgb2gray(rgb):
     gray = np.dot(rgb[...,:3],[0.29894, 0.58704, 0.11402])
     return gray
 
-
+# Borrowed from previous assignment, slightly altered
 def superpixels(img, th_dist = 11):
    # convert image to grayscale
    if (img.ndim == 3):
@@ -92,15 +93,13 @@ def superpixels(img, th_dist = 11):
    seg = rperm[seg]
    return seg
 
-
+# Borrowed from previous assignment, slightly altered
 def seg2graph(seg):
    # get image size
    assert seg.ndim == 2, 'segmentation should be 2D'
    sx, sy = seg.shape
    # get region count
    n_reg = np.amax(seg) + 1
-   # initialize adjacency indicator matrix
-   adjacency_mx = np.zeros((n_reg, n_reg))
    # initialize region pixel lists
    region_pixels = []
    for n in range(n_reg):
@@ -113,15 +112,10 @@ def seg2graph(seg):
          ya = max(0, y - 1)
          yb = min(y + 2, sy)
          r = seg[x,y]                  # region id at current location
-         r_ids = seg[xa:xb, ya:yb]     # ids of neighboring regions
-         r_ids = r_ids.flatten()
-         # update adjacency matrix
-         adjacency_mx[r,r_ids] = 1
-         adjacency_mx[r_ids,r] = 1
          # update pixel list
          px_id = x * sy + y
          region_pixels[r].append(px_id)
-   return adjacency_mx, region_pixels
+   return region_pixels
 
 # Adds artificial labels to training and validation superpixels
 # Returns positive, negative, validation positive, and validation negative in tuples
@@ -144,7 +138,7 @@ def pool_superpixels(tile_df=None):
         print(str(i+1) + " / " + str(imglen))
         supers = superpixels(img)
         img = rgb2gray(img)
-        adjacency_mx, region_pixels = seg2graph(supers)
+        region_pixels = seg2graph(supers)
         perneg = []
         img = img.ravel()
         for superpix in region_pixels:
@@ -164,7 +158,7 @@ def pool_superpixels(tile_df=None):
         print(str(j + 1) + " / " + str(jmglen))
         supers = superpixels(jmg)
         img = rgb2gray(jmg)
-        adjacency_mx, region_pixels = seg2graph(supers)
+        region_pixels = seg2graph(supers)
         perneg = []
         img = img.ravel()
         for superpix in region_pixels:
@@ -184,7 +178,7 @@ def test_superpixels(perceptron, imgs):
     for img in imgs:
         supers = superpixels(img)
         img = rgb2gray(img)
-        adjacency_mx, region_pixels = seg2graph(supers)
+        region_pixels = seg2graph(supers)
         values = []
         inbox = []
         img = img.ravel()
