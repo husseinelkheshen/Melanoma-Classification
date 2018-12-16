@@ -192,13 +192,16 @@ def test_superpixels(perceptron, imgs):
             val = float(np.sum(img[superpix])) / len(superpix)
             values.append(val)
         values.sort()
-        labels = perceptron.predict(values)
-        for ind, val in enumerate(labels[0]):
+        values = np.array(values)
+        labels = perceptron.predict(values.reshape(-1, 1))
+        for ind, val in enumerate(labels):
             if val == 1:
                 inbox.append(region_pixels[ind])
         for superpix in inbox:
             img[superpix] = max(min(values) - 15, min(values))
-        img.reshape(300, 300)
+        img = img.reshape(300, 300)
+        if len(inbox) < 1:
+            continue
         outimages.append(img)
         print(str(len(inbox)) + " / " + str(len(region_pixels)) + " superpixels determined part of lesion.")
     return outimages
@@ -214,8 +217,8 @@ if len(glob('inputdata.pkl')) and len(glob('inputlanels.pkl')) and len(glob('per
         jinputdata = pickle.load(f)
     with open('validlab.pkl', 'rb') as f:
         jinputlabels = pickle.load(f)
-    with open('perceptron-parameters.pkl', 'rb') as f:
-        perceptron = Perceptron().set_params(pickle.load(f))
+    perceptron = Perceptron()
+    perceptron.fit(inputdata.reshape(-1, 1), inputlabels)
 else:
     pos, neg, jpos, jneg = pool_superpixels(tile_df)
     print(len(pos))
@@ -240,15 +243,20 @@ else:
     perceptron.fit(inputdata.reshape(-1, 1), inputlabels)
     with open('perceptron-parameters.pkl', 'wb') as f:
         pickle.dump(perceptron.get_params(), f)
-
+#
 score = perceptron.score(jinputdata.reshape(-1, 1), jinputlabels)
-print(score[0])
-print(score[1])
-print(score)
 with open('perceptron-score.pkl', 'wb') as f:
-    pickle.dump(score)
+    pickle.dump(score, f)
 
-file_path = "image_segmentation.pkl"
+with open('inputdata.pkl', 'rb') as f:
+    inputdata = pickle.load(f)
+with open('inputlabels.pkl', 'rb') as f:
+    inputlabels = pickle.load(f)
+
+perceptron = Perceptron()
+perceptron.fit(inputdata.reshape(-1, 1), inputlabels)
+
+file_path = "images_segmentation.pkl"
 n_bytes = 2 ** 31
 max_bytes = 2 ** 31 - 1
 if len(glob(file_path)) > 0:
@@ -261,16 +269,23 @@ if len(glob(file_path)) > 0:
 else:
     _, _, _, _, imgs_test, labels_test = split_data(tile_df)
 
+to_test = imgs_test
+testct = 100
 test_imgs = []
-for i, j in enumerate(labels_test):
+for i, j in enumerate(labels_test[0:testct]):
     if j == 1:
         test_imgs.append(imgs_test[i])
 
 # This is the array of bounded images to be plotted
 imgs = test_superpixels(perceptron, test_imgs)
+print(imgs[0])
 
+for i, img in enumerate(imgs):
+    plt.figure()
+    plt.imshow(img)
+    plt.savefig("testex" + str(i) + ".png")
 bytes_out = pickle.dumps(imgs)
-with open(file_path, 'wb') as f_out:
+with open("result-images.pkl", 'wb') as f_out:
     for idx in range(0, len(bytes_out), max_bytes):
         f_out.write(bytes_out[idx:idx + max_bytes])
 
